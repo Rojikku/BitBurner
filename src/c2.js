@@ -45,16 +45,20 @@ export async function main(ns) {
             }
         }
     }
+
+    // Refresh if needed
     if (didSomething) {
         // eslint-disable-next-line no-redeclare
         var { servers, db, hacked, difficulties, difKeys, targets, target } = await refresh(ns, serverdb, dbHandle, hackedHandle);
         await targetHandle.write([target]);
     }
 
+    // SCP setup purchased servers
     for (let server of ns.getPurchasedServers()) {
         await scpSetup(ns, server, script_list);
     }
 
+    // If we somehow have nothign to run on,  quit out
     if (hacked.length === 0) {
         ns.toast("Nothing hacked?!", "error");
         await ns.exit();
@@ -93,7 +97,8 @@ export async function main(ns) {
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        if (ns.getHackingLevel() > parseInt(levelGoal)) {
+        // If I have reached  my hacking level goal, hack it
+        while (ns.getHackingLevel() >= parseInt(levelGoal)) {
             let newServer = difficulties[levelGoal];
             // Hack new target, and if you succeed, re-evalute
             if (await hack(ns, newServer)) {
