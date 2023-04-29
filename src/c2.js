@@ -11,7 +11,8 @@ export async function main(ns) {
     let hack_script = "/shared/hack.js";
     let grow_script = "/shared/grow.js";
     let weaken_script = "/shared/weaken.js";
-    let script_list = [hack_script, grow_script, weaken_script];
+    let share_script = "/shared/share.js";
+    let script_list = [hack_script, grow_script, weaken_script, share_script];
 
 
     // Load server list array
