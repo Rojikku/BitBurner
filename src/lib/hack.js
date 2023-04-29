@@ -1,5 +1,21 @@
 /** @param {NS} ns */
 
+export function targetList(ns, difKeys, difficulties, hacked) {
+    // Takes list of keys ordered from difKeys, and difficulties dictionary
+    let skillLevel = ns.getHackingLevel();
+    let targets = [];
+    for (let level of difKeys) {
+        if (level <= skillLevel) {
+            let target = difficulties[level];
+            if (hacked.includes(target)) {
+                targets.push(target);
+            }
+        }
+    }
+    return targets;
+}
+
+
 // Function that loads the DB and then re-populates all contained server information
 export function refreshDB(ns, db, servers = null) {
     // Takes db, refreshes
@@ -91,4 +107,54 @@ export async function hack(ns, hostname) {
         return true;
     }
     return false;
+}
+
+
+export async function refresh(ns, serverdb, dbHandle, hackedHandle) {
+    let servers = await serverdb.read();
+    // If the server list isn't filled, fill it.
+    if (servers.length == 0) {
+        let toScan = ns.scan("home");
+        let mine = /server-./;
+        while (toScan.length > 0) {
+            let server = toScan.shift();
+            // Don't include my servers in the DB
+            if (mine.test(server) || server == "home" || server == "darkweb") {
+                continue;
+            }
+            if (!servers.includes(server)) {
+                servers.push(server);
+                // Scan and add to list
+                toScan = toScan.concat(ns.scan(server));
+            }
+        }
+        await serverdb.write(servers);
+    }
+
+
+    // Refresh the server details
+    let db = dbHandle.read();
+    db = refreshDB(ns, db, servers);
+    await dbHandle.write(db);
+
+    // Refresh hacked status
+    let hacked = listHacked(ns, db);
+    await hackedHandle.write(hacked);
+
+    // Get all levels in a dict
+    let difficulties = {};
+    for (let server of Object.keys(db)) {
+        difficulties[db[server].requiredHackingSkill] = server;
+    }
+    // Setup a list of the difficulties in order
+    let difKeys = Object.keys(difficulties);
+    difKeys = difKeys.sort((a, b) => a - b);
+
+    // Get ordered list of targets by difficulty
+    let targets = targetList(ns, difKeys, difficulties, hacked);
+
+    // Set hacking target to the best one
+    let target = bestValue(ns, targets, db);
+
+    return { servers, db, hacked, difficulties, difKeys, targets, target };
 }

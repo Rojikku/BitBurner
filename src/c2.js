@@ -3,74 +3,7 @@
 
 // Import Libraries
 import { arrayStore, dictStore } from "/lib/db.js";
-import { hack, bestValue, listHacked, scpSetup, refreshDB } from "/lib/hack.js";
-
-
-export function targetList(ns, difKeys, difficulties, hacked) {
-    // Takes list of keys ordered from difKeys, and difficulties dictionary
-    let skillLevel = ns.getHackingLevel();
-    let targets = [];
-    for (let level of difKeys) {
-        if (level <= skillLevel) {
-            let target = difficulties[level];
-            if (hacked.includes(target)) {
-                targets.push(target);
-            }
-        }
-    }
-    return targets;
-}
-
-
-export async function refresh(ns, serverdb, dbHandle, hackedHandle) {
-    let servers = await serverdb.read();
-    // If the server list isn't filled, fill it.
-    if (servers.length == 0) {
-        let toScan = ns.scan("home");
-        let mine = /server-./;
-        while (toScan.length > 0) {
-            let server = toScan.shift();
-            // Don't include my servers in the DB
-            if (mine.test(server) || server == "home" || server == "darkweb") {
-                continue;
-            }
-            if (!servers.includes(server)) {
-                servers.push(server);
-                // Scan and add to list
-                toScan = toScan.concat(ns.scan(server));
-            }
-        }
-        await serverdb.write(servers);
-    }
-
-
-    // Refresh the server details
-    let db = dbHandle.read();
-    db = refreshDB(ns, db, servers);
-    await dbHandle.write(db);
-
-    // Refresh hacked status
-    let hacked = listHacked(ns, db);
-    await hackedHandle.write(hacked);
-
-    // Get all levels in a dict
-    let difficulties = {};
-    for (let server of Object.keys(db)) {
-        difficulties[db[server].requiredHackingSkill] = server;
-    }
-    // Setup a list of the difficulties in order
-    let difKeys = Object.keys(difficulties);
-    difKeys = difKeys.sort((a, b) => a - b);
-
-    // Get ordered list of targets by difficulty
-    let targets = targetList(ns, difKeys, difficulties, hacked);
-
-    // Set hacking target to the best one
-    let target = bestValue(ns, targets, db);
-
-    return { servers, db, hacked, difficulties, difKeys, targets, target };
-}
-
+import { hack, scpSetup, refresh } from "/lib/hack.js";
 
 
 export async function main(ns) {
@@ -87,21 +20,23 @@ export async function main(ns) {
     let dbHandle = new dictStore(ns, "/data/db.txt");
     // Load list of hacked servers
     let hackedHandle = new arrayStore(ns, "/data/hacked.txt");
-
+    // File that lists the next target of hacking
     let targetHandle = new arrayStore(ns, "/data/target.txt");
 
     // Setup all the variables from the refresh function
     var { servers, db, hacked, difficulties, difKeys, targets, target } = await refresh(ns, serverdb, dbHandle, hackedHandle);
-    await targetHandle.write([target]);
+    await targetHandle.write([target]); // Save next target
 
     // If it's not hacked, hack it
     let didSomething = false;
     for (let server of servers) {
-        // Do SCP setup while I'm at it
+        // Do SCP setup while I'm already looping
         await scpSetup(ns, server, script_list);
+        // Skip if already hacked
         if (hacked.includes(server)) {
             continue;
         }
+        // If I have the level to hack it, hack it. If I hack it, set refresh variable to true
         if (ns.getHackingLevel() >= db[server].requiredHackingSkill) {
             if (await hack(ns, server)) {
                 didSomething = true;
@@ -156,11 +91,13 @@ export async function main(ns) {
     }
     let fullUpgrade = false;
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
         if (ns.getHackingLevel() > parseInt(levelGoal)) {
             let newServer = difficulties[levelGoal];
             // Hack new target, and if you succeed, re-evalute
             if (await hack(ns, newServer)) {
+                // eslint-disable-next-line no-redeclare
                 var { servers, db, hacked, difficulties, difKeys, targets, target } = await refresh(ns, serverdb, dbHandle, hackedHandle);
                 await targetHandle.write([target]);
                 ns.toast(`Hacked: ${newServer}!`);
