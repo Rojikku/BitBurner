@@ -1,5 +1,9 @@
 /** @param {NS} ns */
+// Main C2 Script - Run Directly
+
+// Import Libraries
 import { arrayStore, dictStore } from "/lib/db.js";
+import { hack } from "/lib/hack.js";
 
 export function refreshDB(ns, db, servers = null) {
     // Takes db, refreshes
@@ -110,34 +114,6 @@ export async function refresh(ns, serverdb, dbHandle, hackedHandle) {
     return { servers, db, hacked, difficulties, difKeys, targets, target };
 }
 
-export async function hack(ns, hostname) {
-    // Open all ports
-    if (ns.fileExists("BruteSSH.exe", "home")) {
-        ns.brutessh(hostname);
-    }
-    if (ns.fileExists("FTPCrack.exe", "home")) {
-        ns.ftpcrack(hostname);
-    }
-    if (ns.fileExists("relaySMTP.exe", "home")) {
-        ns.relaysmtp(hostname);
-    }
-    if (ns.fileExists("HTTPWorm.exe", "home")) {
-        ns.httpworm(hostname);
-    }
-    if (ns.fileExists("SQLInject.exe", "home")) {
-        ns.sqlinject(hostname);
-    }
-    // Update port count
-    let server = ns.getServer(hostname);
-
-    // Skip if it requires what I don't have
-    let neededPorts = (server.numOpenPortsRequired - server.openPortCount);
-    if (neededPorts <= 0) {
-        await ns.nuke(hostname);
-        return true;
-    }
-    return false;
-}
 
 export async function scpSetup(ns, target, script_list) {
     // Take target and script list, and do SCP work
@@ -188,6 +164,7 @@ export async function main(ns) {
         }
     }
     if (didSomething) {
+        // eslint-disable-next-line no-redeclare
         var { servers, db, hacked, difficulties, difKeys, targets, target } = await refresh(ns, serverdb, dbHandle, hackedHandle);
         await targetHandle.write([target]);
     }
