@@ -3,37 +3,8 @@
 
 // Import Libraries
 import { arrayStore, dictStore } from "/lib/db.js";
-import { hack } from "/lib/hack.js";
+import { hack, bestValue, listHacked, scpSetup, refreshDB } from "/lib/hack.js";
 
-export function refreshDB(ns, db, servers = null) {
-    // Takes db, refreshes
-    // Optionally takes servers if db is empty
-
-    // Define servers if undefined
-    if (servers == null) {
-        servers = Object.keys(db);
-        if (servers.length === 0) {
-            ns.alert("Error, you didn't define servers and DB is empty!")
-            return {};
-        }
-    }
-    // Update DB
-    for (let server of servers) {
-        db[server] = ns.getServer(server);
-    }
-    return db;
-}
-
-export function listHacked(ns, db) {
-    // Returns an array of hacked servers as hacked
-    let hacked = [];
-    for (let server of Object.keys(db)) {
-        if (db[server].hasAdminRights) {
-            hacked.push(server);
-        }
-    }
-    return hacked;
-}
 
 export function targetList(ns, difKeys, difficulties, hacked) {
     // Takes list of keys ordered from difKeys, and difficulties dictionary
@@ -50,20 +21,6 @@ export function targetList(ns, difKeys, difficulties, hacked) {
     return targets;
 }
 
-export function bestValue(ns, targets, db) {
-    // Takes list of targets and server db
-    let best = targets.at(-1);
-    for (let target of targets) {
-        try {
-            if (db[target].moneyMax > db[best].moneyMax) {
-                best = target;
-            }
-        } catch (error) {
-            ns.print(`Had an error in bestValue: ${error}`);
-        }
-    }
-    return best;
-}
 
 export async function refresh(ns, serverdb, dbHandle, hackedHandle) {
     let servers = await serverdb.read();
@@ -115,16 +72,6 @@ export async function refresh(ns, serverdb, dbHandle, hackedHandle) {
 }
 
 
-export async function scpSetup(ns, target, script_list) {
-    // Take target and script list, and do SCP work
-    //Delete old copies
-    for (let script of script_list) {
-        if (ns.fileExists(script, target)) {
-            ns.rm(script, target);
-        }
-    }
-    return await ns.scp(script_list, target);
-}
 
 export async function main(ns) {
     // Define shared scripts in use
