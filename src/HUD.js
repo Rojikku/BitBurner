@@ -1,3 +1,4 @@
+/* eslint-disable no-redeclare */
 /** @param {NS} ns **/
 export async function main(ns) {
     ns.disableLog("ALL");
