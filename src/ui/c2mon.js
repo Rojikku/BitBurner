@@ -15,7 +15,7 @@ export async function main(ns) {
         display:flex;
         flex-direction: column;
         flex-basis: auto;
-        height: 10em;
+        height: 20em;
         padding: 10px;
     }
     .f.mon>span {
@@ -29,19 +29,21 @@ export async function main(ns) {
     ${style}
     <div class="f mon" id="c2mon">
     </div>`, "&#xEEBF");
-    async function reload() {
-        if (!sidebar.contains(item)) return clearInterval(interval);
+    let running = true;
+    while (running) {
+        if (!sidebar.contains(item)) running = false;
         let target = await targetHandle.read();
+        target = ns.getServer(target[0]);
         let hacked = await hackedHandle.read();
+        let servers = ns.getPurchasedServers()
+        let moneyThresh = ns.formatNumber(target.moneyMax * 0.75);
         item.querySelector('#c2mon').innerHTML = `
-        <span style="color:lime;">Target: ${target}</span><br />
-        <span>Servers Hacked: ${hacked.length}</span>
+        <span style="color:lime;">Target:<br /> ${target.hostname}</span><br />
+        <span style="color:lime;">T Money:<br /> \$${ns.formatNumber(target.moneyAvailable)}/${moneyThresh}</span><br />
+        <span style="color:red;">T Diff:<br /> ${ns.formatNumber(target.hackDifficulty, 0)}/${ns.formatNumber(target.minDifficulty + 5, 0)}</span><br />
+        <span>Servers Hacked: ${hacked.length}</span><br />
+        <span>Servers: ${servers.length}/${ns.getPurchasedServerLimit()}</span>
         `;
+        await ns.sleep(1000);
     }
-    reload();
-    let interval = setInterval(reload, 1000);
-    let showNumbers = false;
-    item.addContextItem("Toggle Numbers", () => {
-        showNumbers = !showNumbers;
-    });
 }
