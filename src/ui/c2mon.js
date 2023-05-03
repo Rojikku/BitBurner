@@ -9,13 +9,19 @@ export async function main(ns) {
     let hackedHandle = new arrayStore(ns, "/data/hacked.txt");
     // File that lists the next target of hacking
     let targetHandle = new arrayStore(ns, "/data/target.txt");
+    // File that lists my progs count
+    let progsHandle = new arrayStore(ns, "/data/progs.txt");
+    // File that lists expected completion of current task
+    let timeHandle = new arrayStore(ns, "/data/timer.txt");
+    // Purchase server money handle
+    let purchaseHandle = new arrayStore(ns, "/data/purchase.txt");
 
     let style = `<style>
     .f.mon {
         display:flex;
         flex-direction: column;
         flex-basis: auto;
-        height: 20em;
+        height: 25em;
         padding: 10px;
     }
     .f.mon>span {
@@ -37,12 +43,20 @@ export async function main(ns) {
         let hacked = await hackedHandle.read();
         let servers = ns.getPurchasedServers()
         let moneyThresh = ns.formatNumber(target.moneyMax * 0.75);
+        let progs = await progsHandle.read()[0];
+        if (!progs) progs = 0;
+        let tor = ns.hasTorRouter();
+        let purchaseTarget = await purchaseHandle.read()[0];
+        if (!purchaseTarget) purchaseTarget = "Unknown";
         item.querySelector('#c2mon').innerHTML = `
         <span style="color:lime;">Target:<br /> ${target.hostname}</span><br />
         <span style="color:lime;">T Money:<br /> \$${ns.formatNumber(target.moneyAvailable)}/${moneyThresh}</span><br />
         <span style="color:red;">T Diff:<br /> ${ns.formatNumber(target.hackDifficulty, 0)}/${ns.formatNumber(target.minDifficulty + 5, 0)}</span><br />
         <span>Servers Hacked: ${hacked.length}</span><br />
-        <span>Servers: ${servers.length}/${ns.getPurchasedServerLimit()}</span>
+        <span>Servers: ${servers.length}/${ns.getPurchasedServerLimit()}</span><br />
+        <span>Next Purchase At:<br/> ${purchaseTarget}</span><br />
+        <span>Progs: ${progs}/5</span><br />
+        <span>TOR: ${tor}</span><br />
         `;
         await ns.sleep(1000);
     }

@@ -1,22 +1,7 @@
 /** @param {NS} ns */
 
-export function targetList(ns, difKeys, difficulties, hacked) {
-    // Takes list of keys ordered from difKeys, and difficulties dictionary
-    let skillLevel = ns.getHackingLevel();
-    let targets = [];
-    for (let level of difKeys) {
-        if (level <= skillLevel) {
-            let target = difficulties[level];
-            if (hacked.includes(target)) {
-                targets.push(target);
-            }
-        }
-    }
-    return targets;
-}
-
-
 // Function that loads the DB and then re-populates all contained server information
+// Literally does getServer for each server
 export function refreshDB(ns, db, servers = null) {
     // Takes db, refreshes
     // Optionally takes servers if db is empty
@@ -34,6 +19,17 @@ export function refreshDB(ns, db, servers = null) {
         db[server] = ns.getServer(server);
     }
     return db;
+}
+
+// Function that checks how many programs (progs) exist
+export function checkProgs(ns, progsList) {
+    let progCount = 0;
+    for (let prog of progsList) {
+        if (ns.fileExists(prog, "home")) {
+            progCount++;
+        }
+    }
+    return progCount;
 }
 
 
@@ -63,10 +59,11 @@ export function listHacked(ns, db) {
 
 
 // Function that checks a list of targets, and tells you which one is worth the most money
-export function bestValue(ns, targets, db) {
-    // Takes list of targets and server db
-    let best = targets.at(-1);
-    for (let target of targets) {
+export function bestValue(ns, hacked, db) {
+    // Start with the last one, usually valuable
+    let best = hacked.at(-1);
+    // Compare each one to the best, and if it's better, make it the best
+    for (let target of hacked) {
         try {
             if (db[target].moneyMax > db[best].moneyMax) {
                 best = target;
@@ -110,8 +107,24 @@ export async function hack(ns, hostname) {
 }
 
 
-export async function refresh(ns, serverdb, dbHandle, hackedHandle) {
+export async function refresh(ns, serverdb, dbHandle, hackedHandle, augHandle) {
+    // Read in servers
     let servers = await serverdb.read();
+    // Check if new run
+    let aug = await augHandle.read();
+    if (aug.length > 0) {
+        aug = aug[0];
+    } else {
+        // If no aug time, just reset it
+        aug = 0;
+        servers = [];
+    }
+    if (aug > ns.getTimeSinceLastAug()) {
+        ns.print("Detected new run - resetting!");
+        // Reset servers list if so
+        servers = [];
+    }
+    await augHandle.write(ns.getTimeSinceLastAug());
     // If the server list isn't filled, fill it.
     if (servers.length == 0) {
         let toScan = ns.scan("home");
@@ -150,11 +163,12 @@ export async function refresh(ns, serverdb, dbHandle, hackedHandle) {
     let difKeys = Object.keys(difficulties);
     difKeys = difKeys.sort((a, b) => a - b);
 
-    // Get ordered list of targets by difficulty
-    let targets = targetList(ns, difKeys, difficulties, hacked);
 
     // Set hacking target to the best one
-    let target = bestValue(ns, targets, db);
+    let target = "n00dles";
+    if (hacked.length > 0) {
+        target = bestValue(ns, hacked, db);
+    }
 
-    return { servers, db, hacked, difficulties, difKeys, targets, target };
+    return { servers, db, hacked, difficulties, difKeys, target };
 }
