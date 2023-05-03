@@ -192,6 +192,7 @@ export async function main(ns) {
                 // While I can afford upgrades
                 while ((0.10 * ns.getServerMoneyAvailable("home")) > ns.getPurchasedServerCost(ram)) {
                     let server = serversShoppingList.pop()
+                    if (!server) break;
                     // If, against all odds, the server is already owned, then don't even try it
                     // Might happen if script is restarted
                     if (privateServers.includes(server)) {
