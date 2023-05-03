@@ -10,7 +10,9 @@ export async function main(ns) {
 
     // Prevent unnecessary debug
     ns.disableLog("ALL");
+    ns.print("Starting c2...");
 
+    ns.print("Loading scripts...");
     // Define shared scripts in use
     let hack_script = "/shared/hack.js";
     let grow_script = "/shared/grow.js";
@@ -19,6 +21,7 @@ export async function main(ns) {
     let script_list = [hack_script, grow_script, weaken_script, share_script];
 
 
+    ns.print("Loading file handles...");
     // Load server list array - Static per run
     let serverdb = new arrayStore(ns, "/data/servers.txt");
     // Load server details - Has to be updated constantly
@@ -34,6 +37,7 @@ export async function main(ns) {
     // Purchase server money handle
     let purchaseHandle = new arrayStore(ns, "/data/purchase.txt");
 
+    ns.print("Loading progs...")
     // Handle progs
     // Array that contains an integer referencing how many programs I own
     let progsHandle = new arrayStore(ns, "/data/progs.txt");
@@ -41,12 +45,15 @@ export async function main(ns) {
     let progsList = ["BruteSSH.exe", "FTPCrack.exe", "relaySMTP.exe", "HTTPWorm.exe", "SQLInject.exe"]
     let maxProgs = progsList.length;
     let progs = checkProgs(ns, progsList);
+    ns.print("Progs: " + progs);
     // If progs are maxed, set it to false so it won't check later
     if (progs == maxProgs) {
         maxProgs = false;
+        ns.print("Max Progs!")
     }
     await progsHandle.write(progs);
 
+    ns.print("Loading database...");
     // Setup all the variables from the refresh function
     var { servers, db, hacked, difficulties, difKeys, target } = await refresh(ns, serverdb, dbHandle, hackedHandle, augHandle);
     await targetHandle.write([target]); // Save next target
@@ -61,11 +68,12 @@ export async function main(ns) {
 
     // SCP setup privateServers servers, if we already have them
     for (let server of ns.getPurchasedServers()) {
+        ns.print("Setting up scripts on: " + server);
         await scpSetup(ns, server, script_list);
     }
 
     // Set next hacking level goal
-
+    ns.print("Loading goals...")
     // Get the current target's hacking level as a string
     let previousGoal = (db[target].requiredHackingSkill).toString();
     // Get the index of the next goal based on previous goal
@@ -82,6 +90,7 @@ export async function main(ns) {
 
 
 
+    ns.print("Loading server settings...")
     // Set initial private server RAM value
     let ram = 8;
     // Setup a dict with RAM required for each script
@@ -113,12 +122,16 @@ export async function main(ns) {
 
     // Pool of servers for work
     let pool = hacked.concat(privateServers);
+    ns.print("Setting up pool of " + pool.length + " servers...");
 
+    ns.print("Starting loop...");
     // eslint-disable-next-line no-constant-condition
     while (true) {
 
+        ns.print("[.] Running loop...")
         // Count progs if they're not maxed
         if (maxProgs) {
+            ns.print("Checking progs...");
             progs = checkProgs(ns, progsList);
             if (progs == maxProgs) {
                 maxProgs = false;
@@ -127,6 +140,7 @@ export async function main(ns) {
             if (progs != oldprogs) {
                 runHack = true;
                 oldprogs = progs;
+                ns.print("New prog count: " + progs);
                 await progsHandle.write(progs);
             }
         }
@@ -139,10 +153,12 @@ export async function main(ns) {
             levelGoal = difKeys.at(goalIndex);
             // Run hack function
             runHack = true;
+            ns.print("New hacking level target reached! Next Goal: " + levelGoal)
         }
 
         // If ordered, hack more things
         if (runHack) {
+            ns.print("Running Hack function...");
             let didSomething = false;
             for (let server of servers) {
                 // Skip if already hacked
@@ -163,6 +179,7 @@ export async function main(ns) {
 
             // Refresh if needed
             if (didSomething) {
+                ns.print("Refreshing database...");
                 // eslint-disable-next-line no-redeclare
                 var { servers, db, hacked, difficulties, difKeys, target } = await refresh(ns, serverdb, dbHandle, hackedHandle, augHandle);
                 if (target != origTarget) {
@@ -180,6 +197,7 @@ export async function main(ns) {
         // If servers aren't maxed, consider upgrading
         if (!serversMaxed) {
 
+            ns.print("Dealing with servers...");
             // Track if I buy something
             let didBuy = false;
             // Track if I quit because can't afford
@@ -187,6 +205,7 @@ export async function main(ns) {
 
             // If I'm not fully stocked
             if (!fullStock) {
+                ns.print("Increasing stock of servers...");
                 // Update variable
                 privateServers = ns.getPurchasedServers();
                 // While I can afford upgrades
@@ -202,6 +221,7 @@ export async function main(ns) {
                     if (bought != null) {
                         await scpSetup(ns, server, script_list);
                         didBuy = true;
+                        ns.print("Purchased one server!");
                     } else {
                         // Else, if failed to buy, put it back in the list.
                         serversShoppingList.unshift(server);
@@ -209,12 +229,14 @@ export async function main(ns) {
                 }
                 if (serversShoppingList.length == 0) {
                     fullStock == true;
+                    ns.print("Finished buying servers!");
                 } else {
                     await purchaseHandle.write(ns.getPurchasedServerCost(ram));
                 }
             }
             // If I have purchased all servers
             if (fullStock) {
+                ns.print("Upgrading servers...");
                 // Loop through my servers to buy upgrades
                 // Update variable
                 privateServers = ns.getPurchasedServers();
@@ -226,11 +248,13 @@ export async function main(ns) {
                     // If it costs more than 10%, break
                     if ((0.10 * ns.getServerMoneyAvailable("home")) < ns.getPurchasedServerUpgradeCost(server, ram)) {
                         poor = true;
+                        ns.print("Too poor.");
                         await purchaseHandle.write(ns.getPurchasedServerUpgradeCost(server, ram));
                         break;
                     } else {
                         ns.upgradePurchasedServer(server, ram);
                         didBuy = true;
+                        ns.print("Bought upgrade to " + ram + " GiB on " + server);
                     }
                 }
             }
@@ -246,6 +270,7 @@ export async function main(ns) {
             // If I can't buy more, stop trying
             if (ns.getPurchasedServerMaxRam() < ram) {
                 serversMaxed = true;
+                ns.print("Servers maxed!");
                 await purchaseHandle.write("Maxed");
             }
         }
@@ -253,7 +278,9 @@ export async function main(ns) {
 
         // Make a pool of all servers I can use
         pool = hacked.concat(privateServers);
+        ns.print("Setting up pool of " + pool.length + " servers...");
 
+        ns.print("Deciding on script to run...");
         // Decide on script
         if (ns.getServerSecurityLevel(target) > securityThresh) {
             runScript = weaken_script;
@@ -262,6 +289,7 @@ export async function main(ns) {
         } else {
             runScript = hack_script;
         }
+        ns.print("Decided on: " + runScript);
 
         // Do some farming
         for (let server of pool) {
