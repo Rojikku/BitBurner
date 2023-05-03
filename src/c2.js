@@ -210,7 +210,7 @@ export async function main(ns) {
                 if (serversShoppingList.length == 0) {
                     fullStock == true;
                 } else {
-                    await purchaseHandle.write(ns.getPurchasedServerCost(ram))
+                    await purchaseHandle.write(ns.getPurchasedServerCost(ram));
                 }
             }
             // If I have purchased all servers
@@ -226,7 +226,7 @@ export async function main(ns) {
                     // If it costs more than 10%, break
                     if ((0.10 * ns.getServerMoneyAvailable("home")) < ns.getPurchasedServerUpgradeCost(server, ram)) {
                         poor = true;
-                        await purchaseHandle.write(ns.getPurchasedServerUpgradeCost(server, ram))
+                        await purchaseHandle.write(ns.getPurchasedServerUpgradeCost(server, ram));
                         break;
                     } else {
                         ns.upgradePurchasedServer(server, ram);
@@ -246,7 +246,7 @@ export async function main(ns) {
             // If I can't buy more, stop trying
             if (ns.getPurchasedServerMaxRam() < ram) {
                 serversMaxed = true;
-                await purchaseHandle.write("Maxed")
+                await purchaseHandle.write("Maxed");
             }
         }
 
