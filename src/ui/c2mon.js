@@ -48,7 +48,7 @@ export async function main(ns) {
         let tor = ns.hasTorRouter();
         let purchaseTarget = await purchaseHandle.read();
         if (!purchaseTarget) purchaseTarget = "Unknown";
-        if (!isNaN(purchaseTarget)) purchaseTarget = "$" + ns.formatNumber(purchaseTarget)
+        if (!isNaN(purchaseTarget)) purchaseTarget = "$" + ns.formatNumber(purchaseTarget * 10)
         item.querySelector('#c2mon').innerHTML = `
         <span style="color:lime;">Target:<br /> ${target.hostname}</span><br />
         <span style="color:lime;">T Money:<br /> \$${ns.formatNumber(target.moneyAvailable)}/${moneyThresh}</span><br />
