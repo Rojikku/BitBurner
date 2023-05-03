@@ -21,7 +21,7 @@ export class arrayStore {
     // Setup read function
     async read() {
         let dataString = await this.#r(this.#file);
-        if (dataString.length > 1) {
+        if (dataString.length >= 1) {
             return JSON.parse(dataString);
         } else {
             return [];

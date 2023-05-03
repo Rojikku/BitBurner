@@ -21,7 +21,7 @@ export async function main(ns) {
         display:flex;
         flex-direction: column;
         flex-basis: auto;
-        height: 25em;
+        height: 35em;
         padding: 10px;
     }
     .f.mon>span {
@@ -43,7 +43,8 @@ export async function main(ns) {
         let hacked = await hackedHandle.read();
         let servers = ns.getPurchasedServers()
         let moneyThresh = ns.formatNumber(target.moneyMax * 0.75);
-        let progs = await progsHandle.read()[0];
+        let progs = await progsHandle.read();
+        ns.print(progs);
         if (!progs) progs = 0;
         let tor = ns.hasTorRouter();
         let purchaseTarget = await purchaseHandle.read();
