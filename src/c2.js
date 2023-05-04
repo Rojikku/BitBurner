@@ -3,7 +3,7 @@
 
 // Import Libraries
 import { arrayStore, dictStore } from "/lib/db.js";
-import { hack, scpSetup, refresh, checkProgs } from "/lib/hack.js";
+import { hack, scpSetup, refresh, checkProgs, execScript } from "/lib/hack.js";
 
 
 export async function main(ns) {
@@ -92,7 +92,7 @@ export async function main(ns) {
 
     ns.print("Loading server settings...")
     // Set initial private server RAM value
-    let ram = 8;
+    let ram = 2;
     // Setup a dict with RAM required for each script
     let script_ram = {};
     for (let script of script_list) {
@@ -280,29 +280,142 @@ export async function main(ns) {
         pool = hacked.concat(privateServers);
         ns.print("Setting up pool of " + pool.length + " servers...");
 
-        ns.print("Deciding on script to run...");
-        // Decide on script
-        if (ns.getServerSecurityLevel(target) > securityThresh) {
-            runScript = weaken_script;
-        } else if (ns.getServerMoneyAvailable(target) < moneyThresh) {
-            runScript = grow_script;
-        } else {
-            runScript = hack_script;
-        }
-        ns.print("Decided on: " + runScript);
-
-        // Do some farming
+        let poolRam = 0;
         for (let server of pool) {
-            // Have to use UsedRam function to get latest numbers
+            ns.killall(server);
             let freeRam = ns.getServerMaxRam(server) - ns.getServerUsedRam(server);
-            let hackThreads = (Math.floor(freeRam / script_ram[runScript]));
-            // If it's still doing a task, let it finish
-            if (hackThreads <= 0) {
-                continue;
+            poolRam += freeRam;
+        }
+        let poolThreads = (Math.floor(poolRam / script_ram[grow_script]));
+        ns.print("Pool's RAM at: " + poolRam + " for " + poolThreads + " threads");
+
+        let threadDict = {
+            preWeaken: 0,
+            grow: 0,
+            postWeaken: 0,
+            hack: 0
+        };
+
+        ns.print("Deciding on thread distribution for run...");
+        ns.print("Analyze weaken...");
+        // Get security levels
+        let secLvl = ns.getServerSecurityLevel(target);
+        let secMin = db[target].minDifficulty + 5;
+        let secDiff = secLvl - secMin;
+        // Calculate needed threads
+        threadDict["preWeaken"] = Math.floor(secDiff / ns.weakenAnalyze(1));
+        ns.print("Desired Threads: " + threadDict["preWeaken"]);
+
+        ns.print("Analyze grow...");
+        let money = ns.getServerMoneyAvailable(target);
+        let moneyMax = db[target].moneyMax * 0.75;
+        let growDiff = moneyMax / money;
+        threadDict["grow"] = Math.floor(ns.growthAnalyze(target, growDiff));
+        
+        ns.print("Analyzing effect of grow...")
+        let growEff = ns.growthAnalyzeSecurity(threadDict["grow"], target);
+        threadDict["postWeaken"] = Math.floor(growEff / ns.weakenAnalyze(1));
+
+        ns.print("Analyzing effective money stealing...")
+        let threadPercent = ns.hackAnalyze(target);
+        let hackThreads = 0.5 / threadPercent;
+        threadDict["hack"] = Math.ceil(hackThreads);
+
+        let desiredThreads = 0;
+
+        for (let stage of Object.keys(threadDict)) {
+            if (threadDict[stage] < 1) threadDict[stage] = 0;
+            ns.print("Desired Threads in " + stage + ": " + threadDict[stage]);
+            desiredThreads += threadDict[stage];
+        }
+        ns.print("Total desired threads: " + desiredThreads);
+        ns.print("Total pool threads: " + poolThreads);
+
+        // If I don't have enough threads, scale it down
+        if (desiredThreads > poolThreads) {
+            ns.print("Scaling down threads to cluster...");
+            let threadFactor = Math.ceil(desiredThreads / poolThreads);
+            ns.print("Thread Factor: " + threadFactor);
+
+            for (let stage of Object.keys(threadDict)) {
+                threadDict[stage] = Math.ceil(threadDict[stage] / threadFactor);
+                ns.print("Desired Threads in " + stage + ": " + threadDict[stage]);
             }
-            ns.exec(runScript, server, hackThreads, target);
+            ns.print("Threads scaled down...");
+
+            desiredThreads = 0;
+            for (let stage of Object.keys(threadDict)) {
+                desiredThreads += threadDict[stage];
+            }
+            ns.print("Total desired threads: " + desiredThreads);
         }
 
+        let delayDict = {
+            preWeaken: 0,
+            grow: 0,
+            postWeaken: 0,
+            hack: 0
+        }
+
+        let timeDict = {
+            weaken: ns.getWeakenTime(target),
+            grow: ns.getGrowTime(target),
+            hack: ns.getHackTime(target)
+        }
+
+        ns.print("Setting up delays...");
+        // No delay for first step
+        delayDict["preWeaken"] = 10;
+
+        // Delay second step by time of the first step plus 100ms, minus time required to complete
+        delayDict["grow"] = timeDict["weaken"] + 100 - timeDict["grow"]
+        // If that's a negative number somehow, or previous step has no threads, min delay
+        if (delayDict["grow"] < 10 || threadDict["preWeaken"] < 1) delayDict["grow"] = 10;
+
+        // Third Step
+        delayDict["postWeaken"] = timeDict["grow"] + 100 + delayDict["grow"] - timeDict["weaken"];
+        // If that's a negative number somehow, or previous step has no threads, min delay
+        if (delayDict["postWeaken"] < 0 || threadDict["grow"] < 1) delayDict["postWeaken"] = 10;
+
+        // Fourth Step
+        delayDict["hack"] = timeDict["weaken"] + delayDict["postWeaken"] + 100 - timeDict["hack"];
+        // If that's a negative number somehow, or previous step has no threads, min delay
+        if (delayDict["hack"] < 0 || threadDict["postWeaken"] < 1) delayDict["hack"] = 10;
+
+        for (let stage of Object.keys(delayDict)) {
+            ns.print("Delay for stage " + stage + " is " + delayDict[stage] + "ms");
+        }
+
+
+        var poolIndex = 0;
+        for (let stage of Object.keys(threadDict)) {
+            let assigned = 0;
+            if (poolThreads > 0) {
+                ns.print("Sleeping for delay of " + delayDict[stage] + "ms");
+                await ns.sleep(delayDict[stage]);
+                ns.print("[!] poolIndex: " + poolIndex);
+                ns.print("Assigning " + threadDict[stage] + " threads for " + stage);
+                for (poolIndex; poolIndex < pool.length; poolIndex++) {
+                    if (threadDict[stage] > 0) {
+                        // ns.print(threadDict[stage] + " threads to be assigned...")
+                        var [ reuse, threads, pid ] = execScript(ns, pool[poolIndex], target, script_ram, weaken_script, threadDict[stage]);
+                        if (reuse) {
+                            poolIndex--;
+                        }
+                        assigned += threads;
+                        poolThreads -= threads;
+                        threadDict[stage] -= threads;
+                    } else {
+                        break;
+                    }
+                }
+                ns.print("Assigned threads: " + assigned);
+            } else {
+                break;
+            }
+        }
+
+        ns.print("Sleeping for 5 seconds...");
         // No errors
         await ns.sleep(5000);
     }

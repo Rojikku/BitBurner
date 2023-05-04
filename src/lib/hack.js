@@ -32,6 +32,23 @@ export function checkProgs(ns, progsList) {
     return progCount;
 }
 
+// Function that runs as many threads as possible, and returns threads launched
+export function execScript(ns, server, target, script_ram, runScript, threads) {
+    let reuse = false;
+    let freeRam = ns.getServerMaxRam(server) - ns.getServerUsedRam(server);
+    let hackThreads = Math.floor(freeRam / script_ram[runScript]);
+    // If we can't use it don't try.
+    if (hackThreads <= 0) {
+        reuse = false;
+        return [reuse, 0, 0];
+    }
+    // If we can hack more than we need to, save the excess
+    if (hackThreads > threads) {
+        hackThreads = threads;
+        reuse = true;
+    }
+    return [reuse, hackThreads, ns.exec(runScript, server, hackThreads, target)]
+}
 
 // Function that takes a target and script list, and updates via rm and SCP
 export async function scpSetup(ns, target, script_list) {
