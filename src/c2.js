@@ -415,8 +415,9 @@ export async function main(ns) {
             }
         }
 
-        ns.print("Sleeping for 5 seconds...");
+        let sleepTime = 500 + timeDict["hack"];
+        ns.print("Sleeping for " + sleepTime + "ms");
         // No errors
-        await ns.sleep(5000);
+        await ns.sleep(sleepTime);
     }
 }
