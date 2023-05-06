@@ -82,11 +82,6 @@ export async function main(ns) {
     let levelGoal = difKeys.at(goalIndex);
     // Save current target for later comparison
     let origTarget = target;
-    // Set thresholds for the target
-    let moneyThresh = db[target].moneyMax * 0.75;
-    let securityThresh = db[target].minDifficulty + 5;
-    // Define the script to run
-    let runScript = weaken_script;
 
 
 
@@ -186,8 +181,6 @@ export async function main(ns) {
                     await targetHandle.write([target]);
                     ns.toast(`Changing target to ${target}!`, "info");
                     origTarget = target;
-                    moneyThresh = db[target].moneyMax * 0.75;
-                    securityThresh = db[target].minDifficulty + 5;
                 }
             }
             // Set runHack status back to false
@@ -282,7 +275,6 @@ export async function main(ns) {
 
         let poolRam = 0;
         for (let server of pool) {
-            ns.killall(server);
             let freeRam = ns.getServerMaxRam(server) - ns.getServerUsedRam(server);
             poolRam += freeRam;
         }
@@ -330,6 +322,18 @@ export async function main(ns) {
         }
         ns.print("Total desired threads: " + desiredThreads);
         ns.print("Total pool threads: " + poolThreads);
+
+        // If you want more weaken threads than we have threads in general, just loop
+        if (threadDict["preWeaken"] > (poolThreads * 0.5)) {
+            ns.print("Weaken is more than 50% of the requirement, doing all weakens");
+            for (let server of pool) {
+                var [reuse, threads, pid] = execScript(ns, server, target, script_ram, weaken_script, 999999);
+            }
+            let sleepTime = ns.getWeakenTime(target);
+            ns.print("Sleeping for delay of " + sleepTime + "ms");
+            await ns.sleep(sleepTime);
+            continue;
+        }
 
         // If I don't have enough threads, scale it down
         if (desiredThreads > poolThreads) {
