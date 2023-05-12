@@ -392,7 +392,15 @@ export async function main(ns) {
 
 
         var poolIndex = 0;
+        let used_script = weaken_script;
         for (let stage of Object.keys(threadDict)) {
+            if (stage == "grow") {
+                used_script = grow_script;
+            } else if (stage == "hack") {
+                used_script = hack_script;
+            } else {
+                used_script = weaken_script;
+            }
             let assigned = 0;
             if (poolThreads > 0) {
                 ns.print("Sleeping for delay of " + delayDict[stage] + "ms");
@@ -402,7 +410,7 @@ export async function main(ns) {
                 for (poolIndex; poolIndex < pool.length; poolIndex++) {
                     if (threadDict[stage] > 0) {
                         // ns.print(threadDict[stage] + " threads to be assigned...")
-                        var [ reuse, threads, pid ] = execScript(ns, pool[poolIndex], target, script_ram, weaken_script, threadDict[stage]);
+                        let [reuse, threads, pid] = execScript(ns, pool[poolIndex], target, script_ram, used_script, threadDict[stage]);
                         if (reuse) {
                             poolIndex--;
                         }
