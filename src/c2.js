@@ -302,7 +302,13 @@ export async function main(ns) {
         let money = ns.getServerMoneyAvailable(target);
         let moneyMax = db[target].moneyMax * 0.75;
         let growDiff = moneyMax / money;
-        threadDict["grow"] = Math.floor(ns.growthAnalyze(target, growDiff));
+        try {
+            threadDict["grow"] = Math.floor(ns.growthAnalyze(target, growDiff));
+        } catch (error) {
+            threadDict["grow"] = 0;
+            ns.print("Error: " + error);
+            ns.print("Setting grow threads to 0");
+        }
         
         ns.print("Analyzing effect of grow...")
         let growEff = ns.growthAnalyzeSecurity(threadDict["grow"], target);
